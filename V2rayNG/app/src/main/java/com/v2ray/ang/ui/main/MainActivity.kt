@@ -21,12 +21,12 @@ import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.MmkvManager
+
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
-import com.v2ray.ang.ui.AboutActivity
 import com.v2ray.ang.ui.backup.BackupActivity
 import com.v2ray.ang.ui.base.HelperBaseComponentActivity
-import com.v2ray.ang.ui.checkupdate.CheckUpdateActivity
+
 import com.v2ray.ang.ui.logcat.LogcatActivity
 import com.v2ray.ang.ui.perappproxy.PerAppProxyActivity
 import com.v2ray.ang.ui.routing.RoutingSettingActivity
@@ -144,16 +144,9 @@ class MainActivity : HelperBaseComponentActivity() {
             "user_asset" -> Intent(this, UserAssetActivity::class.java)
             "settings" -> Intent(this, SettingsActivity::class.java)
             "logcat" -> Intent(this, LogcatActivity::class.java)
-            "check_update" -> Intent(this, CheckUpdateActivity::class.java)
+            
             "backup_restore" -> Intent(this, BackupActivity::class.java)
-            "about" -> Intent(this, AboutActivity::class.java)
-            "promotion" -> {
-                Utils.openUri(
-                    this,
-                    "${Utils.decode(AppConfig.APP_PROMOTION_URL)}?t=${System.currentTimeMillis()}"
-                )
-                return
-            }
+            
 
             else -> return
         }
