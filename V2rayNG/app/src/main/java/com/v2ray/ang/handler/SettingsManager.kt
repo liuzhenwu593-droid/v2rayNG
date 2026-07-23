@@ -620,7 +620,7 @@ object SettingsManager {
     private fun ensureDefaultSubscription() {
         if (decodeSubscription(DEFAULT_SUBSCRIPTION_ID) == null) {
             val defaultSub = SubscriptionItem(
-                remarks = "Default",
+                remarks = "其他",
             )
             encodeSubscription(DEFAULT_SUBSCRIPTION_ID, defaultSub)
 
@@ -636,7 +636,7 @@ private fun ensureBuiltinSubscription() {
         if (decodeSubscription(builtinSubId) == null) {
             val builtinSub = SubscriptionItem(
                 remarks = "大绿龙",
-                url = "https://lzwyyds.ccwu.cc/sub?token=f45e2c2645731650cc5863376fc775f6",
+                url = "https://meitu.ccwu.cc/sub?token=27882ec74d1d608cbc6d0f6756bc174f",
                 enabled = true,
                 autoUpdate = true,
                 updateInterval = 1440,
