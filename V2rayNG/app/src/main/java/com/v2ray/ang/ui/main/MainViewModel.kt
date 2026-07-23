@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -81,10 +82,19 @@ class MainViewModel(
 
     private val initialPageReady = CompletableDeferred<Unit>()
 
+    // ---------- Subscription update monitor ----------
+    // Watches subscription lastUpdated timestamps so the UI refreshes automatically
+    // when a background WorkManager task (running in a separate process) writes new
+    // server data to MMKV. Without this, the in-memory groupDataCache stays stale
+    // and the user has to kill the app or manually trigger a refresh to see new nodes.
+    private var subscriptionUpdateMonitor: Job? = null
+    private val lastSeenSubUpdate = ConcurrentHashMap<String, Long>()
+
     // ---------- Service events ----------
     init {
         collectServiceEvents()
         setupGroupTab()
+        startSubscriptionUpdateMonitor()
     }
 
     private fun collectServiceEvents() {
@@ -141,6 +151,70 @@ class MainViewModel(
             is MainServiceEvent.MeasureConfigFinish -> {
                 if (event.finishedCount == "0") {
                     onTestsFinished()
+                }
+            }
+        }
+    }
+
+    // ---------- Subscription update monitor ----------
+    private fun startSubscriptionUpdateMonitor() {
+        subscriptionUpdateMonitor?.cancel()
+        subscriptionUpdateMonitor = viewModelScope.launch(ioDispatcher) {
+            // Wait for the first page to be ready before snapshotting the baseline,
+            // otherwise we would mistake the initial load for an update.
+            initialPageReady.await()
+            delay(2000L)
+            try {
+                dataSource.getSubscriptions().forEach { sub ->
+                    if (sub.guid.isNotEmpty()) {
+                        lastSeenSubUpdate[sub.guid] = sub.subscription.lastUpdated
+                    }
+                }
+            } catch (e: Exception) {
+                LogUtil.e(AppConfig.TAG, "Subscription update monitor init failed", e)
+            }
+
+            while (isActive) {
+                try {
+                    delay(3000L)
+                    val currentSubs = dataSource.getSubscriptions()
+                    val changedSubIds = ArrayList<String>()
+                    currentSubs.forEach { sub ->
+                        if (sub.guid.isEmpty()) return@forEach
+                        val lastUpdated = sub.subscription.lastUpdated
+                        val lastSeen = lastSeenSubUpdate[sub.guid]
+                        if (lastSeen != null && lastUpdated > lastSeen) {
+                            changedSubIds.add(sub.guid)
+                        }
+                        lastSeenSubUpdate[sub.guid] = lastUpdated
+                    }
+                    if (changedSubIds.isEmpty()) continue
+
+                    LogUtil.i(
+                        AppConfig.TAG,
+                        "MainViewModel: subscription update detected for $changedSubIds, refreshing"
+                    )
+                    // Keep the tab strip in sync (a subscription may have been added/removed).
+                    val groups = currentSubs.map {
+                        GroupMapItem(id = it.guid, remarks = it.subscription.remarks)
+                    }
+                    val oldGroups = _uiState.value.groups
+                    val groupsChanged = oldGroups.size != groups.size ||
+                        oldGroups.zip(groups).any { (o, n) -> o.id != n.id || o.remarks != n.remarks }
+                    if (groupsChanged) {
+                        val validIds = groups.mapTo(HashSet()) { it.id }
+                        groupPageFlows.keys.removeAll { it !in validIds }
+                        groupLoadMutexes.keys.removeAll { it !in validIds }
+                        _uiState.update { it.copy(groups = groups) }
+                    }
+                    changedSubIds.forEach { subId ->
+                        cacheMutex.withLock { groupDataCache.remove(subId) }
+                        updateGroupUi(subId, loadGroup(subId, forceRefresh = true))
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (e: Exception) {
+                    LogUtil.e(AppConfig.TAG, "Subscription update monitor error", e)
                 }
             }
         }
@@ -769,6 +843,7 @@ class MainViewModel(
         selectedGroupLoadJob?.cancel()
         reloadJob?.cancel()
         filterJob?.cancel()
+        subscriptionUpdateMonitor?.cancel()
         cancelAllPing()
         dataSource.close()
         super.onCleared()
