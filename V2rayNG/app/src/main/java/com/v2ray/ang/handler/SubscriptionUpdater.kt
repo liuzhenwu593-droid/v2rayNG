@@ -218,7 +218,7 @@ object SubscriptionUpdater {
             showNotification(
                 applicationContext,
                 R.string.title_pref_auto_update_subscription,
-                "更新 ${sub.subscription.remarks}"
+                "更新${sub.subscription.remarks}"
             )
 
             LogUtil.i(AppConfig.TAG, "SubscriptionUpdater update: ---${subItem.remarks}")
