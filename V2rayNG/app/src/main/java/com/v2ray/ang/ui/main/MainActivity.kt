@@ -7,7 +7,18 @@ import android.os.Bundle
 import android.view.KeyEvent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.v2ray.ang.AngApplication
 import com.v2ray.ang.AppConfig
@@ -98,6 +109,10 @@ class MainActivity : HelperBaseComponentActivity() {
 
     @Composable
     override fun ScreenContent() {
+        var showWelcomeDialog by remember {
+            mutableStateOf(!MmkvManager.decodeSettingsBool(PREF_WELCOME_DIALOG_SHOWN))
+        }
+
         MainScreen(
             mainViewModel = mainViewModel,
             onAction = { action ->
@@ -121,6 +136,43 @@ class MainActivity : HelperBaseComponentActivity() {
             shareMethodEntries = resources.getStringArray(R.array.share_method).toList(),
             shareMethodMoreEntries = resources.getStringArray(R.array.share_method_more).toList()
         )
+
+        if (showWelcomeDialog) {
+            WelcomeDialog(
+                onDismiss = {
+                    showWelcomeDialog = false
+                    MmkvManager.encodeSettingsBool(PREF_WELCOME_DIALOG_SHOWN, true)
+                }
+            )
+        }
+    }
+
+    @Composable
+    private fun WelcomeDialog(onDismiss: () -> Unit) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                Text(
+                    text = "公告！",
+                    style = MaterialTheme.typography.headlineSmall
+                )
+            },
+            text = {
+                Text(
+                    text = "禁止传播该软件！用户的一切行为及产生的后果与本软件和开发者无关，请自觉遵守相关法律法规，否则后果自负",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(onClick = onDismiss) {
+                    Text("同意👌")
+                }
+            }
+        )
+    }
+
+    companion object {
+        private const val PREF_WELCOME_DIALOG_SHOWN = "pref_welcome_dialog_shown"
     }
 
     private fun shareToClipboard(guid: String): Boolean =
@@ -144,9 +196,9 @@ class MainActivity : HelperBaseComponentActivity() {
             "user_asset" -> Intent(this, UserAssetActivity::class.java)
             "settings" -> Intent(this, SettingsActivity::class.java)
             "logcat" -> Intent(this, LogcatActivity::class.java)
-            
+
             "backup_restore" -> Intent(this, BackupActivity::class.java)
-            
+
 
             else -> return
         }
