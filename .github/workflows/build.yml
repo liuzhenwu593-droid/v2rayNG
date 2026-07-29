@@ -86,6 +86,31 @@ jobs:
         distribution: 'temurin'
         java-version: '21'
 
+    # ========== 新增：修复 Gradle Wrapper ==========
+    - name: Fix Gradle Wrapper
+      run: |
+        cd ${{ github.workspace }}/V2rayNG
+        
+        # 检测 gradle-wrapper.jar 是否存在，缺失则自动下载补全
+        if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+          echo "gradle-wrapper.jar 缺失，正在自动修复..."
+          
+          # 读取 properties 中的 gradle 版本号
+          WRAPPER_VERSION=$(grep distributionUrl gradle/wrapper/gradle-wrapper.properties | grep -oP 'gradle-\K[0-9.]+')
+          echo "检测到 Gradle 版本: $WRAPPER_VERSION"
+          
+          # 从官方下载对应版本的 gradle-wrapper.jar
+          mkdir -p gradle/wrapper
+          curl -sL -o gradle/wrapper/gradle-wrapper.jar \
+            "https://raw.githubusercontent.com/gradle/gradle/v${WRAPPER_VERSION}/gradle/wrapper/gradle-wrapper.jar"
+          
+          echo "修复完成"
+        fi
+        
+        chmod +x gradlew
+        echo "gradlew 权限已设置"
+    # ==============================================
+
     - name: Build APK (unsigned)
       run: |
         cd ${{ github.workspace }}/V2rayNG
